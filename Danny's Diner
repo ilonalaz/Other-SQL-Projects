@@ -1,0 +1,173 @@
+-- Case Study #1 - Danny's Diner
+--#8WeekSQLChallenge
+
+--creating SQL Schema
+CREATE SCHEMA dannys_diner;
+SET search_path = dannys_diner;
+
+CREATE TABLE sales (
+  "customer_id" VARCHAR(1),
+  "order_date" DATE,
+  "product_id" INTEGER
+);
+
+INSERT INTO sales
+  ("customer_id", "order_date", "product_id")
+VALUES
+  ('A', '2021-01-01', '1'),
+  ('A', '2021-01-01', '2'),
+  ('A', '2021-01-07', '2'),
+  ('A', '2021-01-10', '3'),
+  ('A', '2021-01-11', '3'),
+  ('A', '2021-01-11', '3'),
+  ('B', '2021-01-01', '2'),
+  ('B', '2021-01-02', '2'),
+  ('B', '2021-01-04', '1'),
+  ('B', '2021-01-11', '1'),
+  ('B', '2021-01-16', '3'),
+  ('B', '2021-02-01', '3'),
+  ('C', '2021-01-01', '3'),
+  ('C', '2021-01-01', '3'),
+  ('C', '2021-01-07', '3');
+ 
+
+CREATE TABLE menu (
+  "product_id" INTEGER,
+  "product_name" VARCHAR(5),
+  "price" INTEGER
+);
+
+INSERT INTO menu
+  ("product_id", "product_name", "price")
+VALUES
+  ('1', 'sushi', '10'),
+  ('2', 'curry', '15'),
+  ('3', 'ramen', '12');
+  
+
+CREATE TABLE members (
+  "customer_id" VARCHAR(1),
+  "join_date" DATE
+);
+
+INSERT INTO members
+  ("customer_id", "join_date")
+VALUES
+  ('A', '2021-01-07'),
+  ('B', '2021-01-09');
+
+/* --------------------
+   Case Study Questions
+   --------------------*/
+
+-- 1. What is the total amount each customer spent at the restaurant?
+-- 2. How many days has each customer visited the restaurant?
+-- 3. What was the first item from the menu purchased by each customer?
+-- 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+-- 5. Which item was the most popular for each customer?
+-- 6. Which item was purchased first by the customer after they became a member?
+-- 7. Which item was purchased just before the customer became a member?
+-- 8. What is the total items and amount spent for each member before they became a member?
+-- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+-- 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+
+-- 1. What is the total amount each customer spent at the restaurant?
+SELECT customer_id, SUM(price) AS total_amount
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+GROUP BY customer_id
+ORDER BY total_amount DESC;
+
+--2. How many days has each customer visited the restaurant?
+SELECT customer_id, COUNT(order_date) AS days_count
+FROM dannys_diner.sales
+GROUP  BY customer_id
+ORDER BY days_count DESC;
+
+--3. What was the first item from the menu purchased by each customer?
+SELECT customer_id, sales.product_id, product_name, order_date
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+GROUP BY customer_id, sales.product_id, menu.product_name, order_date
+ORDER BY order_date ASC
+LIMIT 4;
+
+-- 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+SELECT COUNT(order_date) AS purchase_count, sales.product_id, menu.product_name
+FROM dannys_diner.sales
+LEFT JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+GROUP BY sales.product_id, menu.product_name
+ORDER BY purchase_count DESC;
+
+-- 5. Which item was the most popular for each customer?
+SELECT customer_id, COUNT(sales.product_id)AS product_count, menu.product_name
+FROM dannys_diner.sales
+LEFT JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+GROUP BY menu.product_name, sales.customer_id
+ORDER BY sales.customer_id;
+
+-- 6. Which item was purchased first by the customer after they became a member?
+SELECT sales.customer_id, menu.product_name, sales.order_date
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+INNER JOIN dannys_diner.members ON sales.customer_id = members.customer_id
+WHERE order_date >= join_date
+GROUP BY sales.customer_id, menu.product_name, sales.order_date
+ORDER BY order_date ASC;
+
+-- 7. Which item was purchased just before the customer became a member?
+SELECT sales.customer_id, menu.product_name, sales.order_date
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+INNER JOIN dannys_diner.members ON sales.customer_id = members.customer_id
+WHERE order_date < join_date
+GROUP BY sales.customer_id, menu.product_name, sales.order_date
+ORDER BY order_date ASC
+LIMIT 3;
+
+-- 8. What is the total items and amount spent for each member before they became a member?
+SELECT sales.customer_id, COUNT(sales.product_id) AS product_count, SUM(menu.price) AS total_amount
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+INNER JOIN dannys_diner.members ON sales.customer_id = members.customer_id
+WHERE order_date < join_date
+GROUP BY sales.customer_id;
+
+-- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+SELECT points.customer_id, SUM(points) AS points_final
+FROM (SELECT sales.customer_id, 
+       CASE
+           WHEN menu.product_name = 'sushi' THEN SUM(price * 10) * 2
+           ELSE SUM(price * 10)
+       END AS points
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+GROUP BY sales.customer_id, menu.product_name) AS points
+GROUP BY points.customer_id
+ORDER BY points_final DESC;
+
+-- 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do customer A and B have at the end of January?
+SELECT COALESCE(points.customer_id, first_week_points.customer_id) AS customer_id,
+       COALESCE(SUM(points.points), 0) + COALESCE(SUM(first_week_points.first_week_points), 0) AS all_points
+FROM (
+    SELECT sales.customer_id, 
+           CASE
+               WHEN menu.product_name = 'sushi' THEN SUM(price * 10) * 2
+               ELSE SUM(price * 10)
+           END AS points
+    FROM dannys_diner.sales
+    INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+    INNER JOIN dannys_diner.members ON sales.customer_id = members.customer_id
+    WHERE order_date >= '2021-01-16' AND order_date < '2021-02-01' 
+    GROUP BY sales.customer_id, menu.product_name
+) AS points
+FULL JOIN (
+    SELECT sales.customer_id, 
+           SUM(price * 20) AS first_week_points
+    FROM dannys_diner.sales
+    INNER JOIN dannys_diner.menu ON sales.product_id = menu.product_id
+    INNER JOIN dannys_diner.members ON sales.customer_id = members.customer_id
+    WHERE order_date >= members.join_date AND order_date < '2021-01-16T00:00:00.000Z'
+    GROUP BY sales.customer_id, menu.product_name
+) AS first_week_points ON points.customer_id = first_week_points.customer_id
+GROUP BY COALESCE(points.customer_id, first_week_points.customer_id);
