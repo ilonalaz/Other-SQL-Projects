@@ -1,0 +1,48 @@
+--Case Study #2 - Pizza Runner
+--#8WeekSQLChallenge
+
+--How many pizzas were ordered?
+SELECT COUNT (order_id) AS pizza_count
+FROM pizza_runner.customer_orders;
+
+–How many unique customer orders were made?
+SELECT COUNT (DISTINCT order_id)
+FROM pizza_runner.customer_orders;
+
+
+–How many successful orders were delivered by each runner?
+SELECT runner_id, COUNT (DISTINCT runner_orders.order_id) AS orders_number
+FROM pizza_runner.customer_orders
+INNER JOIN pizza_runner.runner_orders
+ON pizza_runner.customer_orders.order_id = pizza_runner.runner_orders.order_id
+GROUP BY runner_id
+ORDER BY orders_number DESC;
+
+
+–How many of each type of pizza was delivered?
+SELECT pizza_names.pizza_id, pizza_names.pizza_name, 
+COUNT (DISTINCT customer_orders.order_id) AS orders_count
+FROM pizza_runner.customer_orders
+INNER JOIN pizza_runner.pizza_names
+ON pizza_runner.customer_orders.pizza_id = pizza_runner.pizza_names.pizza_id
+GROUP BY pizza_names.pizza_id, pizza_names.pizza_name
+ORDER BY orders_count DESC;
+
+
+–How many Vegetarian and Meatlovers were ordered by each customer?
+SELECT customer_id, pizza_id,
+       COUNT(*) AS pizza_count
+FROM pizza_runner.customer_orders
+GROUP BY customer_id, pizza_id
+ORDER BY customer_id;
+
+
+–What was the maximum number of pizzas delivered in a single order?
+SELECT MAX(pizza_count) AS max_pizzas_delivered, order_id
+FROM (
+    SELECT order_id, COUNT(pizza_id) AS pizza_count
+    FROM pizza_runner.customer_orders
+    GROUP BY order_id
+) AS order_counts
+GROUP BY order_counts.order_id
+ORDER BY order_id;
